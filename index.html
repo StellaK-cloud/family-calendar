@@ -270,20 +270,18 @@ function FamilyCalendar() {
   const fromDB = React.useRef({ members: false, events: false, shop: false, vaccineStatus: false });
 
   /* ─── 首次載入：從 Firebase 讀資料 ─── */
-  const DB_VERSION = "v8"; // 改這個值會觸發資料重置
+  const DB_VERSION = "v9"; // 改這個值會觸發資料重置
   useEffect(() => {
     if (!authUser || !curUser) return;
 
-    // 檢查版本號，如果不同就清除舊資料
+    // 檢查版本號，如果不同就清除舊資料（只清內容資料，不清帳號資料）
     db.ref('_dbVersion').once('value').then(snap => {
       if (snap.val() !== DB_VERSION) {
-        // 清除舊資料，重新寫入
         db.ref('events').remove();
         db.ref('members').remove();
         db.ref('shop').remove();
         db.ref('vaccineStatus').remove();
-        db.ref('accountMap').remove();
-        db.ref('pendingUsers').remove();
+        // 不清除 accountMap 和 pendingUsers（帳號管理資料要保留）
         db.ref('_dbVersion').set(DB_VERSION);
         console.log("DB reset to " + DB_VERSION);
       }
@@ -1458,7 +1456,7 @@ function FamilyCalendar() {
           })}
         </div>
         {/* 新增綁定 */}
-        <div style={{padding:16,borderRadius:12,background:"#EFF6FF",border:"1px solid #3B82F633"}}>
+        <div style={{padding:16,borderRadius:12,background:"#EFF6FF",border:"1px solid #3B82F633",marginBottom:16}}>
           <div style={{fontSize:12,fontWeight:700,color:"#3B82F6",marginBottom:8}}>+ 新增帳號綁定</div>
           <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
             <input style={{...S.inp,flex:2,minWidth:160,padding:"8px 12px",fontSize:13}} placeholder="Google 帳號 email" value={bindEmail} onChange={e=>setBindEmail(e.target.value)}/>
@@ -1467,6 +1465,30 @@ function FamilyCalendar() {
               {members.map(m=><option key={m.id} value={m.id}>{m.emoji} {m.name}</option>)}
             </select>
             <button style={{padding:"8px 16px",borderRadius:10,border:"none",background:"#3B82F6",color:"white",fontWeight:700,fontSize:13,cursor:"pointer",whiteSpace:"nowrap"}} onClick={()=>{if(bindEmail.trim()&&bindMember){bindAccount(bindEmail.trim(),bindMember);setBindEmail("");setBindMember("");notify("已綁定 ✓");}}}>綁定</button>
+          </div>
+        </div>
+
+        {/* 所有已綁定帳號總覽 */}
+        <div style={{padding:16,borderRadius:12,background:"#F9FAFB",border:"1px solid #E5E7EB"}}>
+          <div style={{fontSize:12,fontWeight:700,color:"#6B7280",marginBottom:8}}>📋 所有已綁定帳號（{Object.keys(accountMap).length}）</div>
+          <div style={{display:"flex",flexDirection:"column",gap:4}}>
+            {Object.entries(accountMap).map(([emailKey, memberId]) => {
+              const email = emailKey.replace(/_/g, '.');
+              const member = fm(memberId);
+              return (
+                <div key={emailKey} style={{display:"flex",alignItems:"center",gap:8,padding:"8px 12px",borderRadius:8,background:"white",border:"1px solid #E5E7EB"}}>
+                  {member ? <MiniAvatar member={member} size={18}/> : <span style={{fontSize:14}}>❓</span>}
+                  <div style={{flex:1,minWidth:0}}>
+                    <div style={{fontSize:12,fontWeight:600,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{email}</div>
+                    <div style={{fontSize:10,color:member?member.color:"#EF4444"}}>{member ? `→ ${member.name}` : `→ ${memberId}（身分不存在）`}</div>
+                  </div>
+                  {email !== MAMA_EMAIL && (
+                    <button style={{padding:"3px 8px",borderRadius:6,border:"1px solid #EF444433",background:"white",color:"#EF4444",fontSize:10,fontWeight:600,cursor:"pointer"}} onClick={()=>{bindAccount(email,null);notify("已解除 "+email);}}>解除</button>
+                  )}
+                </div>
+              );
+            })}
+            {Object.keys(accountMap).length === 0 && <div style={{fontSize:11,color:"#9CA3AF",textAlign:"center",padding:8}}>尚無綁定帳號</div>}
           </div>
         </div>
       </div>
